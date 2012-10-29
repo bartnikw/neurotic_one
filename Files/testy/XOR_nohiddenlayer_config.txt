@@ -1,0 +1,4 @@
+feedforward 
+bias unipolar
+2 1
+5000 0.3 0.3

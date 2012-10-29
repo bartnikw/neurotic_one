@@ -1,0 +1,4 @@
+feedforward /* rodzaj sieci */
+bias unipolar  /* definicja neuronów (inne opcje to nobias oraz bipolar) */
+2 5 1 /* liczba wejœæ, liczba neuronów w warstwie ukrytej (mo¿e byæ wiêcej warstw), liczba wyjœæ */
+1000 0.7 0.9 /* cykle nauki, wspó³czynnik uczenia, wsp. bezw³adnoœci */
