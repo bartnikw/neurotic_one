@@ -59,8 +59,7 @@ namespace NeuroticOne
         private double [,] trainingFFData = null;
         private double[,] testFFData = null;
 
-        //private double[,] teachingKData = null;
-        //private double[,] points = null;// new int[pointsCount, 2];	// x, y
+        bool teachingDone = false;
         private double[][] trainingKData; //= new double[pointsCount][];
 
 
@@ -129,7 +128,7 @@ namespace NeuroticOne
             this.inputNumberTextBox.Text = inputValues.ToString();
             this.outputNumberTextBox.Text = outputValues.ToString();
             this.cycleCountTextBox.Text = numberOfCycles.ToString();
-            this.startButton.Enabled = parametersLoaded && teachingsLoaded && testsLoaded;
+            //this.startButton.Enabled = parametersLoaded && teachingsLoaded && testsLoaded;
             if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeKohonen)
             {
                 this.kohonenRadioButton.Checked = true;
@@ -139,6 +138,8 @@ namespace NeuroticOne
                 this.feedForwardRadioButton.Checked = true;
             }
             if (this.hiddenLayer!= null) this.layersNumberTextBox.Text = hiddenLayer.Length.ToString();
+            this.startButton.Enabled = this.teachingDone && parametersLoaded && testsLoaded;
+            this.teachButton.Enabled = parametersLoaded && teachingsLoaded;
         }
 
         public NeuroticOneForm()
@@ -457,7 +458,7 @@ namespace NeuroticOne
 
             Neuron.RandRange = new Range(0.0f, 1.0f);//new DoubleRange(0.0, 2.0);
             DistanceNetwork network = new DistanceNetwork(liczba_wejsc, liczba_neuronow_pion * liczba_neuronow_poziom);
-
+            network.Randomize();
             SOMLearning teacher = new SOMLearning(network);
 
             /*foreach (Neuron n in network.Layers[0].Neurons)
@@ -484,36 +485,18 @@ namespace NeuroticOne
                 //for (int i = 0; i < trainingKData.GetLength(0); ++i)
                 //{
                 //    teacher.Run(trainingKData[i]);
-                    //Console.WriteLine("klik {0}", i);
+                //Console.WriteLine("klik {0}", i);
                 //}
                 teacher.RunEpoch(trainingKData);
 
                 SetIterationsCount(iteration++);
                 if (iteration > numberOfCycles) break;
             }
+            double[] test = { 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1 };
 
-            //Console.WriteLine(network.Layers.Length);
-            double[][] testNetwork = new double[9][];
-            for (int i = 0; i < 9; ++i)
-            {
-                testNetwork[i] = new double[2];
-                testNetwork[i][0] = i / 3;
-                testNetwork[i][1] = i % 3;
-            }
-
-            //double[] output = network.Compute(testNetwork);
-            //for (Neuron n in network.Layers[0].Neurons
+            double [] test2 = network.Compute(test);
             network.GetWinner();
-            foreach (Neuron n in network.Layers[0].Neurons)
-            {
-                this.WriteLine(String.Format("I am {0}", n.ToString()));
-                for (int i = 0; i < n.Weights.Length; ++i)
-                {
-                    this.Write(String.Format("[{0}] = {1}\t", i, n.Weights[i]));
-                }
-                WriteLine("");
-            }
-            this.Write("Jest ok");
+
         }
 
         // Worker thread
@@ -970,6 +953,27 @@ namespace NeuroticOne
                     testsLoaded = true;
                     UpdateLabels();
                 }
+            }
+        }
+
+        private void teachButton_Click(object sender, EventArgs e)
+        {
+            UpdateValues();
+            BlockInterface(true);
+            if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeFeedForward)
+            {
+                needToStop = false;
+                if (bias)
+                    workerThread = new Thread(new ThreadStart(FeedForward));
+                else
+                    workerThread = new Thread(new ThreadStart(FeedForwardWithoutBias));
+                workerThread.Start();
+            }
+            else if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeKohonen)
+            {
+                needToStop = false;
+                workerThread = new Thread(new ThreadStart(Kohonen));
+                workerThread.Start();
             }
         }
     }

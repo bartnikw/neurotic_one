@@ -63,6 +63,7 @@
             this.parametersFileDialog = new System.Windows.Forms.OpenFileDialog();
             this.testFileDialog = new System.Windows.Forms.OpenFileDialog();
             this.outputTextBox = new System.Windows.Forms.TextBox();
+            this.teachButton = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.groupBox3.SuspendLayout();
@@ -317,7 +318,7 @@
             this.startButton.Name = "startButton";
             this.startButton.Size = new System.Drawing.Size(126, 23);
             this.startButton.TabIndex = 3;
-            this.startButton.Text = "Start";
+            this.startButton.Text = "Testuj";
             this.startButton.UseVisualStyleBackColor = true;
             this.startButton.Click += new System.EventHandler(this.startButton_Click);
             // 
@@ -338,7 +339,7 @@
             // 
             // loadProblemButton
             // 
-            this.loadProblemButton.Location = new System.Drawing.Point(614, 336);
+            this.loadProblemButton.Location = new System.Drawing.Point(614, 303);
             this.loadProblemButton.Name = "loadProblemButton";
             this.loadProblemButton.Size = new System.Drawing.Size(126, 23);
             this.loadProblemButton.TabIndex = 5;
@@ -349,7 +350,7 @@
             // label7
             // 
             this.label7.AutoSize = true;
-            this.label7.Location = new System.Drawing.Point(611, 252);
+            this.label7.Location = new System.Drawing.Point(611, 219);
             this.label7.Name = "label7";
             this.label7.Size = new System.Drawing.Size(70, 13);
             this.label7.TabIndex = 6;
@@ -358,14 +359,14 @@
             // iterationsCountTextBox
             // 
             this.iterationsCountTextBox.Enabled = false;
-            this.iterationsCountTextBox.Location = new System.Drawing.Point(614, 274);
+            this.iterationsCountTextBox.Location = new System.Drawing.Point(614, 241);
             this.iterationsCountTextBox.Name = "iterationsCountTextBox";
             this.iterationsCountTextBox.Size = new System.Drawing.Size(126, 20);
             this.iterationsCountTextBox.TabIndex = 7;
             // 
             // parametersButton
             // 
-            this.parametersButton.Location = new System.Drawing.Point(614, 307);
+            this.parametersButton.Location = new System.Drawing.Point(614, 274);
             this.parametersButton.Name = "parametersButton";
             this.parametersButton.Size = new System.Drawing.Size(126, 23);
             this.parametersButton.TabIndex = 8;
@@ -375,7 +376,7 @@
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(614, 365);
+            this.button2.Location = new System.Drawing.Point(614, 332);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(126, 23);
             this.button2.TabIndex = 9;
@@ -402,11 +403,22 @@
             this.outputTextBox.Size = new System.Drawing.Size(390, 438);
             this.outputTextBox.TabIndex = 10;
             // 
+            // teachButton
+            // 
+            this.teachButton.Location = new System.Drawing.Point(614, 373);
+            this.teachButton.Name = "teachButton";
+            this.teachButton.Size = new System.Drawing.Size(126, 23);
+            this.teachButton.TabIndex = 11;
+            this.teachButton.Text = "Naucz";
+            this.teachButton.UseVisualStyleBackColor = true;
+            this.teachButton.Click += new System.EventHandler(this.teachButton_Click);
+            // 
             // NeuroticOneForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(752, 466);
+            this.Controls.Add(this.teachButton);
             this.Controls.Add(this.outputTextBox);
             this.Controls.Add(this.button2);
             this.Controls.Add(this.parametersButton);
@@ -469,6 +481,7 @@
         private System.Windows.Forms.TextBox cycleCountTextBox;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.TextBox outputTextBox;
+        private System.Windows.Forms.Button teachButton;
     }
 }
 
