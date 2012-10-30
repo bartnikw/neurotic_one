@@ -61,7 +61,7 @@ namespace NeuroticOne
 
         //private double[,] teachingKData = null;
         //private double[,] points = null;// new int[pointsCount, 2];	// x, y
-        private double[][][] trainingKData; //= new double[pointsCount][];
+        private double[][] trainingKData; //= new double[pointsCount][];
 
 
         //kohonen
@@ -455,8 +455,8 @@ namespace NeuroticOne
             //int neuronCountH = -1;//get
             //int neuronCountV = -1;//get
 
-            Neuron.RandRange = new Range(0.0f, 2.0f);//new DoubleRange(0.0, 2.0);
-            DistanceNetwork network = new DistanceNetwork(2, liczba_neuronow_pion * liczba_neuronow_poziom);
+            Neuron.RandRange = new Range(0.0f, 1.0f);//new DoubleRange(0.0, 2.0);
+            DistanceNetwork network = new DistanceNetwork(liczba_wejsc, liczba_neuronow_pion * liczba_neuronow_poziom);
 
             SOMLearning teacher = new SOMLearning(network);
 
@@ -481,12 +481,12 @@ namespace NeuroticOne
                 teacher.LearningRate = driftingLearningRate * (numberOfCycles - iteration) / numberOfCycles + fixedLearningRate;
                 teacher.LearningRadius = (double)learningRadius * (numberOfCycles - iteration) / numberOfCycles;
 
-                for (int i = 0; i < trainingKData.GetLength(0); ++i)
-                {
-                    teacher.RunEpoch(trainingKData[i]);
+                //for (int i = 0; i < trainingKData.GetLength(0); ++i)
+                //{
+                //    teacher.Run(trainingKData[i]);
                     //Console.WriteLine("klik {0}", i);
-                }
-
+                //}
+                teacher.RunEpoch(trainingKData);
 
                 SetIterationsCount(iteration++);
                 if (iteration > numberOfCycles) break;
@@ -682,14 +682,54 @@ namespace NeuroticOne
                 else if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeKohonen)
                 {
                     StreamReader reader = null;
-                    
+
                     try
                     {
                         reader = File.OpenText(learningFileDialog.FileName);
-                        string str = null;
+                        string str = "";
+                        List<Double> list = new List<Double>();
+                        List<List<Double>> list2 = new List<List<double>>();
+                        list2 = new List<List<double>>();
+                        string[] all = new string[] { Environment.NewLine, " ", ";", "[","]", "\n" };
+                        while ((str = reader.ReadLine()) != null)
+                        {
+                            string[] str2 = str.Split(all,StringSplitOptions.RemoveEmptyEntries);
+                            for (int i = 0; i < str2.Length; ++i)
+                            {
+                                list.Add(Double.Parse(str2[i], NumberStyles.Any));
+                            }
+                            if (str.Contains(']'))
+                            {
+                                list2.Add(list);
+                                list = new List<double>();
+                            }
+                        }
+                        trainingKData = new double[list2.Count][];
+                        for (int i = 0; i < trainingKData.Length; ++i)
+                        {
+                            trainingKData[i] = new double[list2[i].Count];
+                            for (int ii = 0; ii < list2[i].Count; ++ii)
+                            {
+                                trainingKData[i][ii] = list2[i][ii];
+                            }
+                        }
+                        teachingsLoaded = true;
+                        UpdateLabels();
+                    }
+                    catch
+                    {
+                    }
+                    finally
+                    {
+                        if (reader != null) reader.Close();
+                    }
+                        /*string str = null;
                         string[] strs = null;
                         //int i = 0;
-                        str = reader.ReadToEnd();
+                        //str = reader.ReadToEnd();
+                        str = reader.ReadLine();
+                        //char[] newLine = new char[] { Environment.NewLin };
+                        str = str.TrimEnd(Environment.NewLine.ToCharArray());
                         char[] chars = new char[] { ']' };
                         strs = str.Split(chars, StringSplitOptions.RemoveEmptyEntries);
                         int numberOfExamples = strs.Length;
@@ -699,7 +739,7 @@ namespace NeuroticOne
                         for (int i = 0; i < numberOfExamples; ++i)
                         {
                             string[] newLine = new string[] {Environment.NewLine};
-                            string[] all = new string[] {Environment.NewLine, " ", ";", "["};
+                            string[] all = new string[] {Environment.NewLine, " ", ";", "[", "\n"};
                             string[] strs2 = strs[i].Split(newLine, StringSplitOptions.RemoveEmptyEntries);
                             Console.WriteLine(strs[i]);
                             int dimensions = strs2.Length;
@@ -747,7 +787,7 @@ namespace NeuroticOne
                     }
                     finally
                     {
-                    }
+                    }*/
 
                 }
             }
