@@ -33,6 +33,7 @@ namespace NeuroticOne
 
         delegate void SetEnabledCallback(bool value);
         delegate void SetIterationsCountCallback(int count);
+        delegate void UpdateLabelsCallback();
         delegate void WriteCallback(string value);
 
         private const int MaxLearningLines = 50;
@@ -61,6 +62,11 @@ namespace NeuroticOne
 
         bool teachingDone = false;
         private double[][] trainingKData; //= new double[pointsCount][];
+        private double[][] testKData;
+
+
+        private ActivationNetwork activationNetwork;
+        private DistanceNetwork kohonenNetwork;
 
 
         //kohonen
@@ -123,23 +129,32 @@ namespace NeuroticOne
 
         public void UpdateLabels()
         {
-            this.learningRateTextBox.Text = learningRate.ToString();
-            this.momentumTextBox.Text = momentum.ToString();
-            this.inputNumberTextBox.Text = inputValues.ToString();
-            this.outputNumberTextBox.Text = outputValues.ToString();
-            this.cycleCountTextBox.Text = numberOfCycles.ToString();
-            //this.startButton.Enabled = parametersLoaded && teachingsLoaded && testsLoaded;
-            if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeKohonen)
+
+            if (this.startButton.InvokeRequired)
             {
-                this.kohonenRadioButton.Checked = true;
+                UpdateLabelsCallback d = new UpdateLabelsCallback(UpdateLabels);
+                this.Invoke(d);
             }
-            else if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeFeedForward)
+            else
             {
-                this.feedForwardRadioButton.Checked = true;
+                this.learningRateTextBox.Text = learningRate.ToString();
+                this.momentumTextBox.Text = momentum.ToString();
+                this.inputNumberTextBox.Text = inputValues.ToString();
+                this.outputNumberTextBox.Text = outputValues.ToString();
+                this.cycleCountTextBox.Text = numberOfCycles.ToString();
+                //this.startButton.Enabled = parametersLoaded && teachingsLoaded && testsLoaded;
+                if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeKohonen)
+                {
+                    this.kohonenRadioButton.Checked = true;
+                }
+                else if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeFeedForward)
+                {
+                    this.feedForwardRadioButton.Checked = true;
+                }
+                if (this.hiddenLayer != null) this.layersNumberTextBox.Text = hiddenLayer.Length.ToString();
+                this.startButton.Enabled = this.teachingDone && parametersLoaded && testsLoaded;
+                this.teachButton.Enabled = parametersLoaded && teachingsLoaded;
             }
-            if (this.hiddenLayer!= null) this.layersNumberTextBox.Text = hiddenLayer.Length.ToString();
-            this.startButton.Enabled = this.teachingDone && parametersLoaded && testsLoaded;
-            this.teachButton.Enabled = parametersLoaded && teachingsLoaded;
         }
 
         public NeuroticOneForm()
@@ -164,7 +179,23 @@ namespace NeuroticOne
             this.learningFileDialog.FileName = "teachunipolar.txt";
             UpdateLabels();
         }
+        #region InterfaceUpdates
 
+
+        private void biasCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            bias = biasCheckBox.Checked;
+        }
+
+        private void unipolarRadioButton_CheckedChanged(object sender, EventArgs e)
+        {
+            this.currentActivationFunctionType = NeuroticActivationFunctionType.NeuroticActivationFunctionTypeUnipolar;
+        }
+
+        private void biPolarRadioButton_CheckedChanged(object sender, EventArgs e)
+        {
+            this.currentActivationFunctionType = NeuroticActivationFunctionType.NeuroticActivationFunctionTypeBipolar;
+        }
         private void BlockInterface(bool value)
         {
             
@@ -253,7 +284,8 @@ namespace NeuroticOne
                 this.SwitchInterface(NeuroticProgramType.NeuroticProgramTypeKohonen);
             }
         }
-
+        #endregion
+        #region Writing_Texbox
         private void Write(string text)
         {
             if (this.outputTextBox.InvokeRequired)
@@ -273,15 +305,12 @@ namespace NeuroticOne
         {
             this.Write(String.Concat(text, Environment.NewLine));
         }
+        #endregion
 
-        void FeedForward()
+        void FeedForwardTeach()
         {
             int samples = trainingFFData.GetLength(0);
 
-            //int hiddenlayers = 1;
-            //int outputCount = 1;
-            //int cycles = 1000;
-           
             double[][] input = new double[samples][];
             double[][] output = new double[samples][];
 
@@ -321,16 +350,26 @@ namespace NeuroticOne
             Array.Copy(hiddenLayer, 0, newHidden, 0, hiddenLayer.Length);
             newHidden[newHidden.Length-1] = outputValues;
         //    newHidden[0] = inputValues;
-            ActivationNetwork network = new ActivationNetwork(new BipolarSigmoidFunction(), inputValues, newHidden);
+            activationNetwork = new ActivationNetwork(new BipolarSigmoidFunction(), inputValues, newHidden);
+            ISupervisedLearning teacher;
+            if (bias)
+            {
+                teacher = new BackPropagationLearning(activationNetwork);
+                BackPropagationLearning teacherbp = teacher as BackPropagationLearning;
+                teacherbp.LearningRate = learningRate;
+                teacherbp.Momentum = momentum;
+            }
+            else
+            {
+                teacher = new BackPropagationLearningWithoutBias(activationNetwork);
+                BackPropagationLearningWithoutBias teacherbp = teacher as BackPropagationLearningWithoutBias;
+                teacherbp.LearningRate = learningRate;
+                teacherbp.Momentum = momentum;
+            }
+            SetIterationsCount(0);
+            int iteration = 1;
+
             
-            BackPropagationLearning teacher = new BackPropagationLearning(network);
-            teacher.LearningRate = learningRate;
-            teacher.Momentum = momentum;
-            SetIterationsCount(0);
-            int iteration = 1;
-
-            //double[,] solution = new double[50, outputValues];
-            double[] networkInput = new double[inputValues];
 
             while (!needToStop)
             {
@@ -339,95 +378,16 @@ namespace NeuroticOne
                 SetIterationsCount(iteration);
                 if (++iteration > numberOfCycles) break;
             }
-
-            WriteLine("Test:");
-            for (int j = 0; !needToStop && j < this.testFFData.GetLength(0); ++j)
-            {
-                Write("[");
-                for (int jj = 0; jj < inputValues; ++jj)
-                {
-                    networkInput[jj] = this.testFFData[j, jj];
-                    Write(String.Concat(" ", networkInput[jj].ToString()));
-                }
-                double[] result = network.Compute(networkInput);
-                Write(" ] -> [");
-                for (int jj = 0; jj < outputValues; ++jj)
-                {
-                    Write(string.Concat(" ", Math.Round(result[jj],5).ToString()));
-                }
-                WriteLine(" ];");
-            }
             BlockInterface(false);
+            teachingDone = true;
             needToStop = false;
+            UpdateLabels();
         }
 
-        void FeedForwardWithoutBias()
+        void FeedForwardTest()
         {
-            int samples = trainingFFData.GetLength(0);
-
-            //int hiddenlayers = 1;
-            //int outputCount = 1;
-            //int cycles = 1000;
-
-            double[][] input = new double[samples][];
-            double[][] output = new double[samples][];
-
-            WriteLine("Teaching:");
-            for (int i = 0; i < samples; i++)
-            {
-                input[i] = new double[inputValues];
-                output[i] = new double[outputValues];
-
-                // set input
-                for (int q = 0; q < inputValues; ++q)
-                {
-                    input[i][q] = trainingFFData[i, q];
-                }
-
-                // set output
-                for (int q = inputValues; q < inputValues + outputValues; ++q)
-                {
-                    output[i][q - inputValues] = trainingFFData[i, q];
-                }
-
-                Write("[");
-                for (int q = 0; q < inputValues; ++q)
-                {
-                    Write(String.Concat(" ", input[i][q].ToString()));
-                }
-                Write(" ] -> [");
-                for (int q = 0; q < outputValues; ++q)
-                {
-                    Write(string.Concat(" ", output[i][q].ToString()));
-                }
-                WriteLine(" ];");
-
-            }
-            //IActivationFunction
-            int[] newHidden = new int[hiddenLayer.Length + 2];
-            Array.Copy(hiddenLayer, 0, newHidden, 1, hiddenLayer.Length);
-            newHidden[newHidden.Length - 1] = outputValues;
-            newHidden[0] = inputValues;
-            ActivationNetwork network = new ActivationNetwork(new BipolarSigmoidFunction(), inputValues, newHidden);
-
-            BackPropagationLearningWithoutBias teacher = new BackPropagationLearningWithoutBias(network);
-            teacher.LearningRate = learningRate;
-            teacher.Momentum = momentum;
-            SetIterationsCount(0);
-            int iteration = 1;
-
-            //double[,] solution = new double[50, outputValues];
+            WriteLine("Test:");
             double[] networkInput = new double[inputValues];
-
-            while (!needToStop)
-            {
-                double error = teacher.RunEpoch(input, output);
-
-                SetIterationsCount(iteration);
-                if (++iteration > numberOfCycles) break;
-            }
-
-            WriteLine("Test:");
             for (int j = 0; !needToStop && j < this.testFFData.GetLength(0); ++j)
             {
                 Write("[");
@@ -436,11 +396,11 @@ namespace NeuroticOne
                     networkInput[jj] = this.testFFData[j, jj];
                     Write(String.Concat(" ", networkInput[jj].ToString()));
                 }
-                double[] result = network.ComputeWithoutBias(networkInput);
+                double[] result = bias ? activationNetwork.Compute(networkInput) : activationNetwork.ComputeWithoutBias(networkInput);
                 Write(" ] -> [");
                 for (int jj = 0; jj < outputValues; ++jj)
                 {
-                    Write(string.Concat(" ", result[jj].ToString()));
+                    Write(string.Concat(" ", Math.Round(result[jj], 5).ToString()));
                 }
                 WriteLine(" ];");
             }
@@ -448,29 +408,14 @@ namespace NeuroticOne
             needToStop = false;
         }
 
-        void Kohonen()
+        void KohonenTeach()
         {
-            //Kohonen is a distance network
 
-            //int inputCount = -1;//to get
-            //int neuronCountH = -1;//get
-            //int neuronCountV = -1;//get
+            Neuron.RandRange = new Range(0.0f, 1.0f);
+            kohonenNetwork = new DistanceNetwork(liczba_wejsc, liczba_neuronow_pion * liczba_neuronow_poziom);
+            kohonenNetwork.Randomize();
+            SOMLearning teacher = new SOMLearning(kohonenNetwork);
 
-            Neuron.RandRange = new Range(0.0f, 1.0f);//new DoubleRange(0.0, 2.0);
-            DistanceNetwork network = new DistanceNetwork(liczba_wejsc, liczba_neuronow_pion * liczba_neuronow_poziom);
-            network.Randomize();
-            SOMLearning teacher = new SOMLearning(network);
-
-            /*foreach (Neuron n in network.Layers[0].Neurons)
-            {
-                this.WriteLine(String.Format("I am {0}", n ToString()));
-                //for (int i = 0; i < n.Weights.Length; ++i)
-                //{
-                //    this.Write(String.Format("[{0}] = {1}\t", i, n.Weights[i]));
-                //}
-                //WriteLine("");
-            }
-             */
 
             double driftingLearningRate = this.wps_zmiany_wsp;
             double fixedLearningRate = this.pocz_wart_wsp_nauki;
@@ -482,109 +427,48 @@ namespace NeuroticOne
                 teacher.LearningRate = driftingLearningRate * (numberOfCycles - iteration) / numberOfCycles + fixedLearningRate;
                 teacher.LearningRadius = (double)learningRadius * (numberOfCycles - iteration) / numberOfCycles;
 
-                //for (int i = 0; i < trainingKData.GetLength(0); ++i)
-                //{
-                //    teacher.Run(trainingKData[i]);
-                //Console.WriteLine("klik {0}", i);
-                //}
                 teacher.RunEpoch(trainingKData);
 
                 SetIterationsCount(iteration++);
                 if (iteration > numberOfCycles) break;
             }
-            double[] test = { 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1 };
-
-            double [] test2 = network.Compute(test);
-            network.GetWinner();
+            teachingDone = true;
+            needToStop = false;
+            UpdateLabels();
 
         }
 
-        // Worker thread
-        /*void SearchSolution()
+
+        void KohonenTest()
         {
-            // number of learning samples
-            int samples; //= data.GetLength(0);
-            // data transformation factor
-            double yFactor;// = 1.7 / chart.RangeY.Length;
-            double yMin;// = chart.RangeY.Min;
-            double xFactor;// = 2.0 / chart.RangeX.Length;
-            double xMin;// = chart.RangeX.Min;
-
-            // prepare learning data
-            double[][] input = new double[samples][];
-            double[][] output = new double[samples][];
-
-            for (int i = 0; i < samples; i++)
+            WriteLine("Testowanie Kohonena");
+            int oneVectorLength = this.testKData[0].Length;
+            double[] networkInput = new double[oneVectorLength];
+            for (int j = 0; !needToStop && j < this.testKData.Length; ++j)
             {
-                input[i] = new double[1];
-                output[i] = new double[1];
-
-                // set input
-                input[i][0] = (data[i, 0] - xMin) * xFactor - 1.0;
-                // set output
-                output[i][0] = (data[i, 1] - yMin) * yFactor - 0.85;
-            }
-
-            // create multi-layer neural network
-            ActivationNetwork network = new ActivationNetwork(
-                new BipolarSigmoidFunction(sigmoidAlphaValue),
-                1, neuronsInFirstLayer, 1);
-            // create teacher
-            BackPropagationLearning teacher = new BackPropagationLearning(network);
-            // set learning rate and momentum
-            teacher.LearningRate = learningRate;
-            teacher.Momentum = momentum;
-
-            // iterations
-            int iteration = 1;
-
-            // solution array
-            double[,] solution = new double[50, 2];
-            double[] networkInput = new double[1];
-
-            // calculate X values to be used with solution function
-            for (int j = 0; j < 50; j++)
-            {
-                solution[j, 0] = chart.RangeX.Min + (double)j * chart.RangeX.Length / 49;
-            }
-
-            // loop
-            while (!needToStop)
-            {
-                // run epoch of learning procedure
-                double error = teacher.RunEpoch(input, output) / samples;
-
-                // calculate solution
-                for (int j = 0; j < 50; j++)
+                Write("[");
+                for (int jj = 0; jj < oneVectorLength; ++jj)
                 {
-                    networkInput[0] = (solution[j, 0] - xMin) * xFactor - 1.0;
-                    solution[j, 1] = (network.Compute(networkInput)[0] + 0.85) / yFactor + yMin;
+                    networkInput[jj] = this.testKData[j][jj];
+                    Write(String.Concat(" ", networkInput[jj].ToString()));
                 }
-                chart.UpdateDataSeries("solution", solution);
-                // calculate error
-                double learningError = 0.0;
-                for (int j = 0, k = data.GetLength(0); j < k; j++)
-                {
-                    networkInput[0] = input[j][0];
-                    learningError += Math.Abs(data[j, 1] - ((network.Compute(networkInput)[0] + 0.85) / yFactor + yMin));
-                }
-
-                // set current iteration's info
-                currentIterationBox.Text = iteration.ToString();
-                currentErrorBox.Text = learningError.ToString("F3");
-
-                // increase current iteration
-                iteration++;
-
-                // check if we need to stop
-                if ((iterations != 0) && (iteration > iterations))
-                    break;
+                Write(" ] -> ");
+                kohonenNetwork.Compute(networkInput);
+                int num = kohonenNetwork.GetWinner();
+                WriteLine(String.Format("{0} ;", num));
+                //double[] result = activationNetwork.Compute(networkInput);
+                //Write(" ] -> [");
+                //for (int jj = 0; jj < outputValues; ++jj)
+                //{
+                //    Write(string.Concat(" ", Math.Round(result[jj], 5).ToString()));
+                //}
+                //WriteLine(" ];");
             }
+            BlockInterface(false);
+            needToStop = false;
+        }
 
-
-            // enable settings controls
-            EnableControls(true);
-        }*/
+       
 
         private void startButton_Click(object sender, EventArgs e)
         {
@@ -593,16 +477,13 @@ namespace NeuroticOne
             if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeFeedForward)
             {
                 needToStop = false;
-                if(bias)
-                    workerThread = new Thread(new ThreadStart(FeedForward));
-                else
-                    workerThread = new Thread(new ThreadStart(FeedForwardWithoutBias));
+                workerThread = new Thread(new ThreadStart(FeedForwardTest));
                 workerThread.Start();
             }
             else if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeKohonen)
             {
                 needToStop = false;
-                workerThread = new Thread(new ThreadStart(Kohonen));
+                workerThread = new Thread(new ThreadStart(KohonenTest));
                 workerThread.Start();
             }
         }
@@ -647,6 +528,7 @@ namespace NeuroticOne
                         Array.Copy(tmp, 0, trainingFFData, 0, i * length);
 
                         teachingsLoaded = true;
+                        UpdateLabels();
 
                     }
                     catch (Exception c)
@@ -706,71 +588,6 @@ namespace NeuroticOne
                     {
                         if (reader != null) reader.Close();
                     }
-                        /*string str = null;
-                        string[] strs = null;
-                        //int i = 0;
-                        //str = reader.ReadToEnd();
-                        str = reader.ReadLine();
-                        //char[] newLine = new char[] { Environment.NewLin };
-                        str = str.TrimEnd(Environment.NewLine.ToCharArray());
-                        char[] chars = new char[] { ']' };
-                        strs = str.Split(chars, StringSplitOptions.RemoveEmptyEntries);
-                        int numberOfExamples = strs.Length;
-                        trainingKData = new double[numberOfExamples][][];
-                        //chars = new char[] { ']', '[' };
-                        
-                        for (int i = 0; i < numberOfExamples; ++i)
-                        {
-                            string[] newLine = new string[] {Environment.NewLine};
-                            string[] all = new string[] {Environment.NewLine, " ", ";", "[", "\n"};
-                            string[] strs2 = strs[i].Split(newLine, StringSplitOptions.RemoveEmptyEntries);
-                            Console.WriteLine(strs[i]);
-                            int dimensions = strs2.Length;
-                            Console.WriteLine(dimensions.ToString());
-                            Console.WriteLine(numberOfExamples.ToString());
-                            strs2 = strs[i].Split(all, StringSplitOptions.RemoveEmptyEntries);
-                            double[][] pom = new double[strs2.Length][];
-                            int q = 0;
-                            for (int ii = 0; ii < strs2.Length; ++ii)
-                            {
-                                int value = int.Parse(strs2[ii]);
-                                if (value > 0)
-                                {
-                                    pom[q] = new double[2];
-                                    pom[q][0] = ii / dimensions;
-                                    pom[q][1] = ii % dimensions;
-                                    q++;
-                                }
-                            }
-                            trainingKData[i] = new double[q][];
-                            for (int ii = 0; ii < q; ++ii)
-                            {
-
-                                trainingKData[i][ii] = new double[2];
-                                trainingKData[i][ii][0] = pom[ii][0];
-                                trainingKData[i][ii][1] = pom[ii][1];
-                            }
-
-                        }
-                        teachingsLoaded = true;
-                        for(int i=0; i<numberOfExamples; i++)
-                        {
-                            for (int j = 0; j < trainingKData[0].Length; j++)
-                            {
-                                for(int k=0; k<trainingKData[0][0].Length; k++)
-                                Console.Write(trainingKData[i][j][k].ToString());
-                            }
-                            Console.WriteLine();
-                            }
-
-                        UpdateLabels();
-                    }
-                    catch
-                    {
-                    }
-                    finally
-                    {
-                    }*/
 
                 }
             }
@@ -883,22 +700,10 @@ namespace NeuroticOne
                             reader.Close();
                     }
             }
+            teachingDone = false;
+            UpdateLabels();
         }
 
-        private void biasCheckBox_CheckedChanged(object sender, EventArgs e)
-        {
-            bias = biasCheckBox.Checked;
-        }
-
-        private void unipolarRadioButton_CheckedChanged(object sender, EventArgs e)
-        {
-            this.currentActivationFunctionType = NeuroticActivationFunctionType.NeuroticActivationFunctionTypeUnipolar;
-        }
-
-        private void biPolarRadioButton_CheckedChanged(object sender, EventArgs e)
-        {
-            this.currentActivationFunctionType = NeuroticActivationFunctionType.NeuroticActivationFunctionTypeBipolar;
-        }
 
         private void button2_Click(object sender, EventArgs e)
         {
@@ -949,9 +754,50 @@ namespace NeuroticOne
                 }
                 else if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeKohonen)
                 {
-                    //blabla bla
-                    testsLoaded = true;
-                    UpdateLabels();
+                    StreamReader reader = null;
+                    try
+                    {
+                        reader = File.OpenText(testFileDialog.FileName);
+                        string str = "";
+                        List<Double> list = new List<Double>();
+                        List<List<Double>> list2 = new List<List<double>>();
+                        list2 = new List<List<double>>();
+                        string[] all = new string[] { Environment.NewLine, " ", ";", "[", "]", "\n" };
+                        while ((str = reader.ReadLine()) != null)
+                        {
+                            string[] str2 = str.Split(all, StringSplitOptions.RemoveEmptyEntries);
+                            for (int i = 0; i < str2.Length; ++i)
+                            {
+                                string aString = str2[i].Replace('.', ',');
+                                list.Add(Double.Parse(aString, NumberStyles.Any));
+                            }
+                            if (str.Contains(']'))
+                            {
+                                list2.Add(list);
+                                list = new List<double>();
+                            }
+                        }
+                        testKData = new double[list2.Count][];
+                        for (int i = 0; i < testKData.Length; ++i)
+                        {
+                            testKData[i] = new double[list2[i].Count];
+                            for (int ii = 0; ii < list2[i].Count; ++ii)
+                            {
+                                testKData[i][ii] = list2[i][ii];
+                            }
+                        }
+
+                        testsLoaded = true;
+                        UpdateLabels();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                    finally
+                    {
+                        if (reader != null) reader.Close();
+                    }
                 }
             }
         }
@@ -963,16 +809,13 @@ namespace NeuroticOne
             if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeFeedForward)
             {
                 needToStop = false;
-                if (bias)
-                    workerThread = new Thread(new ThreadStart(FeedForward));
-                else
-                    workerThread = new Thread(new ThreadStart(FeedForwardWithoutBias));
+                workerThread = new Thread(new ThreadStart(FeedForwardTeach));
                 workerThread.Start();
             }
             else if (this.currentNetworkType == NeuroticProgramType.NeuroticProgramTypeKohonen)
             {
                 needToStop = false;
-                workerThread = new Thread(new ThreadStart(Kohonen));
+                workerThread = new Thread(new ThreadStart(KohonenTeach));
                 workerThread.Start();
             }
         }
